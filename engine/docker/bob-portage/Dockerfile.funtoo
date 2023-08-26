@@ -24,5 +24,5 @@ RUN ego sync
 FROM busybox:latest as final
 LABEL maintainer="${MAINTAINER}"
 RUN mkdir -p /var/git
-COPY --from=builder /var/git/meta-repo /var/git/meta-repo/
+COPY --from=builder --chown=portage:portage /var/git/meta-repo /var/git/meta-repo/
 VOLUME /var/git/meta-repo /var/cache/eix
