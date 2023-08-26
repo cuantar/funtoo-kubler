@@ -659,6 +659,8 @@ function build_rootfs() {
         # install packages defined in image's build.sh
         # shellcheck disable=SC2086
         "${_emerge_bin}" ${_emerge_opt} --binpkg-respect-use=y -v ${_packages}
+        # might not exist
+        mkdir -p /etc/portage/profile
         [[ -f "${_PACKAGE_INSTALLED}" ]] \
             && sed -e '/^virtual/d' < "${_PACKAGE_INSTALLED}" >> /etc/portage/profile/package.provided
 
