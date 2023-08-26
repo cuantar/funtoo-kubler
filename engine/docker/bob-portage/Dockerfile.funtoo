@@ -1,0 +1,28 @@
+#FROM busybox:latest AS builder
+
+#COPY ${BOB_CURRENT_PORTAGE_FILE} /
+#COPY patches/ /patches
+
+#RUN set -x && \
+    #mkdir -p /var/db/repos/ && \
+    #xzcat /${BOB_CURRENT_PORTAGE_FILE} | tar -xf - -C /var/db/repos && \
+    #mv /var/db/repos/portage /var/db/repos/gentoo && \
+    #mkdir -p /var/db/repos/gentoo/metadata && \
+    #rm /${BOB_CURRENT_PORTAGE_FILE} && \
+    #cd /var/db/repos/gentoo && \
+    #patch -p1 -i /patches/0002* && \
+    #patch -p1 -i /patches/0003* && \
+    #patch -p1 -i /patches/0004*
+
+#FROM busybox:latest
+#COPY --from=builder /var/db/repos/gentoo /var/db/repos/gentoo
+
+
+FROM funtoo:latest as builder
+RUN ego sync
+
+FROM busybox:latest as final
+LABEL maintainer="${MAINTAINER}"
+RUN mkdir -p /var/git
+COPY --from=builder /var/git/meta-repo /var/git/meta-repo/
+VOLUME /var/git/meta-repo /var/cache/eix

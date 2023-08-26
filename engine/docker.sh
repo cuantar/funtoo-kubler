@@ -610,18 +610,24 @@ function import_portage_tree() {
     local image_id image_tag image_path portage_file portage_tmp_file
     image_id="$1"
     image_tag="$2"
-    image_exists_or_rm "${image_id}" "${image_tag}" && return 0
+    # Gentoo case only
+    #if [[ -z "${BOB_FUNTOO+moo}" ]]; then
+        image_exists_or_rm "${image_id}" "${image_tag}" && return 0
+    #fi
 
     # add current image id to output logging
     add_status_value 'portage'
 
-    _status_msg="download portage snapshot"
-    PORTAGE_DATE="${PORTAGE_DATE:-latest}"
-    portage_file="portage-${PORTAGE_DATE}.tar.xz"
-    _pwrap_callback=( 'cb_add_filesize_to_status' "${KUBLER_DOWNLOAD_DIR}/${portage_file//latest/${_TODAY}}" )
-    pwrap download_portage_snapshot "${portage_file}" || die "Failed to download portage snapshot ${portage_file}"
+    # Gentoo case only
+    if [[ -z "${BOB_FUNTOO+moo}" ]]; then
+        _status_msg="download portage snapshot"
+        PORTAGE_DATE="${PORTAGE_DATE:-latest}"
+        portage_file="portage-${PORTAGE_DATE}.tar.xz"
+        _pwrap_callback=( 'cb_add_filesize_to_status' "${KUBLER_DOWNLOAD_DIR}/${portage_file//latest/${_TODAY}}" )
+        pwrap download_portage_snapshot "${portage_file}" || die "Failed to download portage snapshot ${portage_file}"
 
-    portage_file="${portage_file//latest/${_TODAY}}"
+        portage_file="${portage_file//latest/${_TODAY}}"
+    fi
 
     if [[ "${KUBLER_DISABLE_KUBLER_NS}" != 'true' ]]; then
         image_path="${KUBLER_DATA_DIR}"/namespaces/kubler/builder/bob-portage
@@ -632,11 +638,14 @@ function import_portage_tree() {
     cp "${_KUBLER_DIR}"/engine/docker/bob-portage/Dockerfile.template "${image_path}"/
     cp -r "${_KUBLER_DIR}"/engine/docker/bob-portage/patches "${image_path}"/
 
-    add_trap_fn 'handle_import_portage_tree_error'
-    # shellcheck disable=SC2154
-    portage_tmp_file="${image_path}/${portage_file}"
-    cp "${KUBLER_DOWNLOAD_DIR}/${portage_file}" "${portage_tmp_file}"
-    export BOB_CURRENT_PORTAGE_FILE="${portage_file}"
+    # Gentoo case only
+    if [[ -z "${BOB_FUNTOO+moo}" ]]; then
+        add_trap_fn 'handle_import_portage_tree_error'
+        # shellcheck disable=SC2154
+        portage_tmp_file="${image_path}/${portage_file}"
+        cp "${KUBLER_DOWNLOAD_DIR}/${portage_file}" "${portage_tmp_file}"
+        export BOB_CURRENT_PORTAGE_FILE="${portage_file}"
+    fi
 
     _status_msg="bootstrap ${image_id} image"
     generate_dockerfile "${image_path}"

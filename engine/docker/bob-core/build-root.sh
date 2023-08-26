@@ -74,6 +74,11 @@ function copy_gcc_libs() {
 # Arguments:
 # 1: new_portage_path, optional, default: /var/sync
 function fix_portage_profile_symlink() {
+    # Funtoo
+    if [[ ! -z "${BOB_FUNTOO+moo}" ]]; then
+        echo FUNTOO
+        return
+    fi
     local new_portage_path old_profile
     new_portage_path="${1:-/var/db/repos/gentoo}"
     old_profile="$(readlink -m /etc/portage/make.profile)"
@@ -89,6 +94,10 @@ function fix_portage_profile_symlink() {
 
 # Clone a fork of hasufell/portage-gentoo-git-config and copy postsync hooks, part of stage3 builder setup
 function install_git_postsync_hooks() {
+    # Funtoo
+    if [[ ! -z "${BOB_FUNTOO+moo}" ]]; then
+        return
+    fi
     git clone https://github.com/srcshelton/portage-gentoo-git-config.git gitsync
     cp ./gitsync/repo.postsync.d/sync_* /etc/portage/repo.postsync.d/
     chmod +x /etc/portage/repo.postsync.d/sync_*
@@ -295,8 +304,8 @@ function log_as_installed() {
 function update_use() {
     local flaggie_args
     flaggie_args=()
-    [[ "${BOB_PACKAGE_CONFIG_DIFF}" == 'false' ]] && flaggie_args+=('--no-diff')
-    [[ "${BOB_PACKAGE_CONFIG_STRICT}" == 'false' ]] && flaggie_args+=('--force')
+   # [[ "${BOB_PACKAGE_CONFIG_DIFF}" == 'false' ]] && flaggie_args+=('--no-diff')
+    [[ "${BOB_PACKAGE_CONFIG_STRICT}" == 'true' ]] && flaggie_args+=('--strict')
     # shellcheck disable=SC2068
     flaggie "${flaggie_args[@]}" ${@}
 }
@@ -422,6 +431,10 @@ function is_installed_overlay() {
 # 2: repo_url - optional, default: assume repo_id is in eselect repository list
 # 3: repo_mode - optional, default: git
 function add_overlay() {
+    # Funtoo
+    if [[ ! -z "${BOB_FUNTOO+moo}" ]]; then
+        return
+    fi
     local repo_id repo_url repo_mode
     repo_id="$1"
     repo_url="$2"
@@ -642,7 +655,7 @@ function build_rootfs() {
             mkdir -p "${_PORTAGE_LOGDIR}"
             export PORTAGE_LOGDIR="${_PORTAGE_LOGDIR}"
         fi
-        
+
         # install packages defined in image's build.sh
         # shellcheck disable=SC2086
         "${_emerge_bin}" ${_emerge_opt} --binpkg-respect-use=y -v ${_packages}

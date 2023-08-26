@@ -370,7 +370,7 @@ function get_stage3_archive_regex() {
     __get_stage3_archive_regex=
     local stage3_base
     stage3_base="$1"
-    __get_stage3_archive_regex="${stage3_base//+/(\\+|%2B)?}-([0-9]{8})(T[0-9]{6}Z)?\\.tar\\.(bz2|xz)"
+    __get_stage3_archive_regex="${stage3_base//+/(\\+|%2B)?}-?([0-9]{8})?(T[0-9]{6}Z)?\\.tar\\.(bz2|xz)"
 }
 
 # Fetch latest stage3 archive name/type, returns exit signal 3 if no archive could be found
@@ -391,8 +391,14 @@ function fetch_stage3_archive_name() {
             break
         fi
     done
-    [[ "${remote_date//[!0-9]/}" -eq 0 ]] && return 3
-    __fetch_stage3_archive_name="${STAGE3_BASE}-${remote_date}.tar.${remote_file_type}"
+    # Funtoo case
+    if [[ "${remote_date//[!0-9]/}" -eq 0 ]]; then  #&& return 3
+        # Funtoo is somewhat easier
+        __fetch_stage3_archive_name="${STAGE3_BASE}.tar.xz"
+    # Gentoo
+    else
+        __fetch_stage3_archive_name="${STAGE3_BASE}-${remote_date}.tar.${remote_file_type}"
+    fi
 }
 
 function is_gpg_check_enabled() {
@@ -432,14 +438,24 @@ function download_stage3() {
           wget_exit wget_args
     is_autobuild=false
     stage3_file="$1"
-    stage3_asc="${stage3_file}.asc"
-    stage3_contents="${stage3_file}.CONTENTS"
-    # some stage3 builds use a compressed contents file now while others still use the plain variant
-    if ! wget -q --method=HEAD "${ARCH_URL}${stage3_contents}"; then
-      stage3_contents="${stage3_contents}.gz"
+
+    # Gentoo case
+    if [[ -z ${BOB_FUNTOO+moo} ]]; then
+        stage3_asc="${stage3_file}.asc"
+        stage3_contents="${stage3_file}.CONTENTS"
+        # some stage3 builds use a compressed contents file now while others still use the plain variant
+        if ! wget -q --method=HEAD "${ARCH_URL}${stage3_contents}"; then
+          stage3_contents="${stage3_contents}.gz"
+        fi
+        stage3_digests="${stage3_file}.DIGESTS"
+        [[ "${ARCH_URL}" == *autobuilds*  ]] && is_autobuild=true
+
+    # Funtoo case
+    else
+        stage3_asc="${stage3_file}.gpg"
+        stage3_contents="${stage3_file}.hash.txt"
+        stage3_digests="${stage3_file}.hash.txt"
     fi
-    stage3_digests="${stage3_file}.DIGESTS"
-    [[ "${ARCH_URL}" == *autobuilds*  ]] && is_autobuild=true
 
     wget_args=()
     [[ "${_arg_verbose}" == 'off' ]] && wget_args+=( '-q' '-nv' )
@@ -447,6 +463,8 @@ function download_stage3() {
     for file in "${stage3_file}" "${stage3_asc}" "${stage3_contents}" "${stage3_digests}"; do
         [ -f "${KUBLER_DOWNLOAD_DIR}/${file}" ] && continue
 
+#    Gentoo case
+    if [[ -z ${BOB_FUNTOO+moo} ]]; then
         _handle_download_error_args="${KUBLER_DOWNLOAD_DIR}/${file}"
         add_trap_fn 'handle_download_error'
         wget "${wget_args[@]}" -O "${KUBLER_DOWNLOAD_DIR}/${file}" "${ARCH_URL}${file}"
@@ -454,25 +472,36 @@ function download_stage3() {
         [[ "${wget_exit}" -eq 8 ]] && msg_error "HTTP 404 for ${file}, try running the update command to resolve this."
         [[ "${wget_exit}" -ne 0 ]] && exit $?
         rm_trap_fn 'handle_download_error'
-    done
 
-    is_gpg_check_enabled
-    if [ "${__is_gpg_check_enabled}" == 'true' ] && [ "${is_autobuild}" == true ]; then
-        gpg --verify "${KUBLER_DOWNLOAD_DIR}/${stage3_asc}" || gpg_help_and_die
-    elif [ "${is_autobuild}" == false ]; then
-        msg "GPG verification not supported for experimental stage3 tar balls, only checking SHA512"
+        is_gpg_check_enabled
+        if [ "${__is_gpg_check_enabled}" == 'true' ] && [ "${is_autobuild}" == true ]; then
+            gpg --verify "${KUBLER_DOWNLOAD_DIR}/${stage3_asc}" || gpg_help_and_die
+        elif [ "${is_autobuild}" == false ]; then
+            msg "GPG verification not supported for experimental stage3 tar balls, only checking SHA512"
+        else
+            msg "Skipped stage3 GPG signature check"
+        fi
+        # some experimental stage3 builds don't update the file names in the digest file, replace so sha512 check won't fail
+        grep -q "${STAGE3_BASE}-2008\.0\.tar\.bz2" "${KUBLER_DOWNLOAD_DIR}/${stage3_digests}" \
+            && sed -i'' "s/${STAGE3_BASE}-2008\.0\.tar\.bz2/${stage3_file}/g" "${KUBLER_DOWNLOAD_DIR}/${stage3_digests}"
+        sha512_hashes="$(grep -A1 SHA512 "${KUBLER_DOWNLOAD_DIR}/${stage3_digests}" | grep -v '^--')"
+        sha512_check="$(cd "${KUBLER_DOWNLOAD_DIR}/" && (echo "${sha512_hashes}" | $(sha_sum) -c))"
+        sha512_failed="$(echo "${sha512_check}" | grep FAILED)"
+        if [ -n "${sha512_failed}" ]; then
+            die "${sha512_failed}"
+        fi
+        local checksums
+        readarray -t checksums <<< $(<${stage3_digests})
+        echo ${checksums[2]} ${checksums[1]}
+        sha512_check="$(cd "${KUBLER_DOWNLOAD_DIR}/" && ${checksums[1]}sum -c $stage3_digests)"
+    # Funtoo case
     else
-        msg "Skipped stage3 GPG signature check"
+        is_gpg_check_enabled
+        if [ "${__is_gpg_check_enabled}" == 'true' ]; then
+            gpg --verify "${KUBLER_DOWNLOAD_DIR}/${stage3_asc}" || gpg_help_and_die
+        fi
     fi
-    # some experimental stage3 builds don't update the file names in the digest file, replace so sha512 check won't fail
-    grep -q "${STAGE3_BASE}-2008\.0\.tar\.bz2" "${KUBLER_DOWNLOAD_DIR}/${stage3_digests}" \
-        && sed -i'' "s/${STAGE3_BASE}-2008\.0\.tar\.bz2/${stage3_file}/g" "${KUBLER_DOWNLOAD_DIR}/${stage3_digests}"
-    sha512_hashes="$(grep -A1 SHA512 "${KUBLER_DOWNLOAD_DIR}/${stage3_digests}" | grep -v '^--')"
-    sha512_check="$(cd "${KUBLER_DOWNLOAD_DIR}/" && (echo "${sha512_hashes}" | $(sha_sum) -c))"
-    sha512_failed="$(echo "${sha512_check}" | grep FAILED)"
-    if [ -n "${sha512_failed}" ]; then
-        die "${sha512_failed}"
-    fi
+done
 }
 
 # Download and verify portage snapshot, when using latest it will download at most once per day
@@ -480,6 +509,10 @@ function download_stage3() {
 # Arguments:
 # 1: portage_file
 function download_portage_snapshot() {
+    # Funtoo case: no snapshots
+    if [[ ! -z ${BOB_FUNTOO+moo} ]]; then
+        return
+    fi
     PORTAGE_DATE="${PORTAGE_DATE:-latest}"
     local portage_file portage_sig portage_md5 file dl_name wget_args portage_url parsed_mirrors
     portage_file="$1"
