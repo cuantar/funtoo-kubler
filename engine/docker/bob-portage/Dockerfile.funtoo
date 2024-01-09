@@ -17,10 +17,10 @@
 #FROM busybox:latest
 #COPY --from=builder /var/db/repos/gentoo /var/db/repos/gentoo
 
-
+ARG CACHEMOO2="pancakes"
 FROM funtoo:latest as builder
+ARG CACHEMOO2=$REMOVE_CACHE
 RUN ego sync
-
 FROM busybox:latest as final
 LABEL maintainer="${MAINTAINER}"
 RUN mkdir -p /var/git
