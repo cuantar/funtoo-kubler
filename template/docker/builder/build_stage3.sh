@@ -29,7 +29,11 @@ configure_builder() {
     update_keywords 'app-admin/su-exec' '+~amd64'
     emerge dev-vcs/git app-eselect/eselect-repository app-misc/jq app-shells/bash-completion
     #install_git_postsync_hooks
-    [[ "${BOB_UPDATE_WORLD}" == true ]] && emerge -vuND world
+    if [[ "${BOB_UPDATE_WORLD}" == true ]]; then
+        emerge -vuND --keep-going --with-bdeps=y -j$(nproc) -l$(nproc) @world
+        emerge -c
+    fi
     add_overlay kubler https://github.com/edannenberg/kubler-overlay.git
     emerge dev-lang/go
+    print Reached the end of the builder script.
 }
