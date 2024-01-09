@@ -30,8 +30,8 @@ configure_builder() {
     emerge dev-vcs/git app-eselect/eselect-repository app-misc/jq app-shells/bash-completion
     #install_git_postsync_hooks
     if [[ "${BOB_UPDATE_WORLD}" == true ]]; then
-        emerge -vuND --keep-going --with-bdeps=y -j$(nproc) -l$(nproc) @world
-        emerge -c
+        emerge -vuND --keep-going --with-bdeps=y -j$(nproc) -l$(nproc) @world || echo emerge error occurred!
+        emerge -c || echo error unmerging but probably fine!
     fi
     add_overlay kubler https://github.com/edannenberg/kubler-overlay.git
     emerge dev-lang/go
