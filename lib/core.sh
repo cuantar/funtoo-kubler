@@ -41,7 +41,7 @@ readonly _IMAGE_PATH="images/"
 readonly _BUILDER_PATH="builder/"
 readonly _BUILD_TEST_FAILED_FILE=".kubler-build-test.error"
 readonly _HEALTHCHECK_FAILED_FILE=".kubler-healthcheck.error"
-readonly _STAGE3_NAMESPACE="kubler-gentoo"
+readonly _STAGE3_NAMESPACE="kubler-funtoo"
 readonly _PORTAGE_IMAGE="${_STAGE3_NAMESPACE}/portage"
 readonly _PORTAGE_CONTAINER="${_STAGE3_NAMESPACE}-portage"
 _TODAY="$(date +%Y%m%d)"
@@ -463,16 +463,16 @@ function download_stage3() {
     for file in "${stage3_file}" "${stage3_asc}" "${stage3_contents}" "${stage3_digests}"; do
         [ -f "${KUBLER_DOWNLOAD_DIR}/${file}" ] && continue
 
+    _handle_download_error_args="${KUBLER_DOWNLOAD_DIR}/${file}"
+    add_trap_fn 'handle_download_error'
+    wget "${wget_args[@]}" -O "${KUBLER_DOWNLOAD_DIR}/${file}" "${ARCH_URL}${file}"
+    wget_exit=$?
+    [[ "${wget_exit}" -eq 8 ]] && msg_error "HTTP 404 for ${file}, try running the update command to resolve this."
+    [[ "${wget_exit}" -ne 0 ]] && exit $?
+    rm_trap_fn 'handle_download_error'
+
 #    Gentoo case
     if [[ -z ${BOB_FUNTOO+moo} ]]; then
-        _handle_download_error_args="${KUBLER_DOWNLOAD_DIR}/${file}"
-        add_trap_fn 'handle_download_error'
-        wget "${wget_args[@]}" -O "${KUBLER_DOWNLOAD_DIR}/${file}" "${ARCH_URL}${file}"
-        wget_exit=$?
-        [[ "${wget_exit}" -eq 8 ]] && msg_error "HTTP 404 for ${file}, try running the update command to resolve this."
-        [[ "${wget_exit}" -ne 0 ]] && exit $?
-        rm_trap_fn 'handle_download_error'
-
         is_gpg_check_enabled
         if [ "${__is_gpg_check_enabled}" == 'true' ] && [ "${is_autobuild}" == true ]; then
             gpg --verify "${KUBLER_DOWNLOAD_DIR}/${stage3_asc}" || gpg_help_and_die
