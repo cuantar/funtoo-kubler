@@ -35,5 +35,5 @@ configure_builder() {
     fi
     add_overlay kubler https://github.com/edannenberg/kubler-overlay.git
     emerge dev-lang/go
-    print Reached the end of the builder script.
+    printf Reached the end of the builder script.
 }
